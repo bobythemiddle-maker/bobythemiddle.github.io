@@ -35,4 +35,194 @@
 
         .top-nav { position: absolute; top: 20px; left: 20px; right: 20px; display: flex; justify-content: space-between; z-index: 100; }
         .icon-btn { background: var(--container-bg); border: 1px solid var(--glass-border); color: var(--text-main); width: 45px; height: 45px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; backdrop-filter: blur(10px); transition: 0.2s; }
-        .icon
+        .icon-btn:hover { transform: scale(1.1); }
+        #exit-btn { opacity: 0; pointer-events: none; }
+        #exit-btn.visible { opacity: 1; pointer-events: auto; }
+
+        #start-screen, #quiz-screen, #result-screen, #builder-screen { 
+            display: none; flex-direction: column; align-items: center; 
+            backdrop-filter: blur(16px); background: var(--container-bg); 
+            padding: 40px; border-radius: 28px; border: 1px solid var(--glass-border); 
+            width: 440px; box-shadow: 0 25px 50px rgba(0,0,0,0.2); 
+        }
+        #start-screen { display: flex; }
+
+        .btn { background: var(--accent); color: white; border: none; padding: 16px; border-radius: 14px; font-size: 1rem; font-weight: 700; cursor: pointer; margin: 8px 0; width: 100%; transition: 0.2s; }
+        .btn:hover { filter: brightness(1.1); transform: translateY(-2px); }
+        .btn-secondary { background: rgba(148, 163, 184, 0.2); color: var(--text-main); }
+
+        .bulk-container { display: flex; gap: 10px; width: 100%; margin-bottom: 15px; }
+        .bulk-box { flex: 1; display: flex; flex-direction: column; gap: 5px; }
+        .bulk-box label { font-size: 0.75rem; font-weight: bold; color: var(--accent); }
+        textarea.bulk-input { 
+            width: 100%; height: 150px; background: var(--input-bg); 
+            border: 1px solid var(--glass-border); border-radius: 12px; 
+            color: var(--text-main); padding: 10px; font-size: 0.8rem; 
+            resize: none; outline: none; box-sizing: border-box;
+        }
+
+        #preview-box { width: 100%; height: 50px; background: rgba(0,0,0,0.1); border-radius: 10px; padding: 10px; font-size: 0.7rem; overflow-y: auto; color: var(--text-sub); margin-bottom: 15px; border: 1px dashed var(--glass-border); }
+
+        .stack-container { position: relative; width: 100%; height: 160px; margin: 20px 0 30px; }
+        .card { position: absolute; inset: 0; background: var(--card-gradient); border-radius: 24px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; font-weight: 800; border: 1px solid var(--glass-border); transition: 0.5s; padding: 20px; text-align: center; }
+        .swipe-out { transform: translateX(450px) rotate(15deg) !important; opacity: 0 !important; }
+        
+        #answerInput { width: 100%; background: var(--input-bg); border: 2px solid var(--glass-border); padding: 16px; border-radius: 14px; color: var(--text-main); text-align: center; font-size: 1.2rem; outline: none; }
+        #feedback { margin-top: 15px; height: 20px; font-weight: 700; font-size: 0.8rem; }
+    </style>
+</head>
+<body>
+
+    <div class="top-nav">
+        <button id="exit-btn" class="icon-btn" onclick="location.reload()">✕</button>
+        <button class="icon-btn" onclick="toggleTheme()">🌓</button>
+    </div>
+
+    <div id="start-screen">
+        <h1 style="margin-bottom: 25px;">Language Tool</h1>
+        <button class="btn" onclick="showScreen('builder-screen')">➕ Bulk Paste List</button>
+        <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">📂 Import .TXT</button>
+        <input type="file" id="fileInput" style="display:none" onchange="handleFileUpload(event)">
+    </div>
+
+    <div id="builder-screen">
+        <h2>Bulk Import</h2>
+        <p style="font-size: 0.7rem; color: var(--text-sub); margin-bottom: 15px;">Paste one word per line. They will be paired automatically.</p>
+        
+        <div class="bulk-container">
+            <div class="bulk-box">
+                <label>Language One</label>
+                <textarea id="bulk-spa" class="bulk-input" placeholder="Appel&#10;Bes&#10;Banaan"></textarea>
+            </div>
+            <div class="bulk-box">
+                <label>Language Two</label>
+                <textarea id="bulk-eng" class="bulk-input" placeholder="Apple&#10;Berry&#10;Banana"></textarea>
+            </div>
+        </div>
+
+        <button class="btn" onclick="processBulk()">Combine & Load</button>
+        <div id="preview-box">Cards Loaded: 0</div>
+        
+        <button class="btn" style="background:var(--success)" onclick="startBuilderQuiz()">Start Quiz</button>
+        <button class="btn btn-secondary" onclick="showScreen('start-screen')">Back</button>
+    </div>
+
+    <div id="quiz-screen">
+        <div class="stack-container">
+            <div id="card-1" class="card"></div>
+        </div>
+        <input type="text" id="answerInput" placeholder="Type answer..." autocomplete="off">
+        <div id="feedback"></div>
+        <div style="display:flex; width:100%; gap:12px; margin-top:15px">
+            <button class="btn btn-secondary" onclick="revealAnswer()">Hint</button>
+            <button id="mainBtn" class="btn" onclick="checkAnswer()">Check</button>
+        </div>
+    </div>
+
+    <div id="result-screen">
+        <h1>Complete!</h1>
+        <h2 id="final-score" style="color: var(--accent);"></h2>
+        <button class="btn" onclick="location.reload()">Back to Menu</button>
+    </div>
+
+    <script>
+        let quizData = {};
+        let keys = [];
+        let currentIndex = 0;
+        let score = 0;
+        let builderData = {};
+
+        function showScreen(id) {
+            ['start-screen', 'quiz-screen', 'result-screen', 'builder-screen'].forEach(s => {
+                document.getElementById(s).style.display = s === id ? 'flex' : 'none';
+            });
+            document.getElementById('exit-btn').classList.toggle('visible', id !== 'start-screen');
+        }
+
+        function toggleTheme() {
+            document.body.setAttribute('data-theme', document.body.getAttribute('data-theme') === 'light' ? 'dark' : 'light');
+        }
+
+        function processBulk() {
+            const spaText = document.getElementById('bulk-spa').value.split('\n').map(s => s.trim()).filter(s => s !== "");
+            const engText = document.getElementById('bulk-eng').value.split('\n').map(s => s.trim()).filter(s => s !== "");
+
+            if(spaText.length !== engText.length) {
+                alert(`Warning: Lists are uneven! Side A has ${spaText.length} words, Side B has ${engText.length}.`);
+            }
+
+            const limit = Math.min(spaText.length, engText.length);
+            for(let i = 0; i < limit; i++) {
+                builderData[spaText[i].toLowerCase()] = engText[i].toLowerCase();
+            }
+
+            document.getElementById('preview-box').innerText = `Cards Loaded (${Object.keys(builderData).length}): ` + Object.keys(builderData).join(', ');
+            document.getElementById('bulk-spa').value = '';
+            document.getElementById('bulk-eng').value = '';
+        }
+
+        function startBuilderQuiz() {
+            if(Object.keys(builderData).length === 0) return alert("Paste words and click Combine first!");
+            quizData = {...builderData};
+            startQuiz();
+        }
+
+        function startQuiz() {
+            keys = Object.keys(quizData).sort(() => Math.random() - 0.5);
+            currentIndex = 0; score = 0;
+            showScreen('quiz-screen');
+            loadCard();
+        }
+
+        function loadCard() {
+            if(currentIndex >= keys.length) return showResults();
+            document.getElementById('mainBtn').innerText = "Check";
+            document.getElementById('card-1').innerText = keys[currentIndex];
+            document.getElementById('card-1').classList.remove('swipe-out');
+            document.getElementById('answerInput').value = '';
+            document.getElementById('answerInput').focus();
+            document.getElementById('feedback').innerText = '';
+        }
+
+        function checkAnswer() {
+            let val = document.getElementById('answerInput').value.trim().toLowerCase();
+            if(val === quizData[keys[currentIndex]]) {
+                score++; nextCard();
+            } else {
+                document.getElementById('feedback').innerText = "WRONG";
+                document.getElementById('feedback').style.color = 'var(--error)';
+            }
+        }
+
+        function revealAnswer() {
+            document.getElementById('feedback').innerText = `ANS: ${quizData[keys[currentIndex]]}`;
+            document.getElementById('feedback').style.color = 'var(--accent)';
+            document.getElementById('mainBtn').innerText = "Next";
+            document.getElementById('mainBtn').onclick = nextCard;
+        }
+
+        function nextCard() {
+            // Reset the button back to check mode for the next card
+            document.getElementById('mainBtn').onclick = checkAnswer;
+            document.getElementById('card-1').classList.add('swipe-out');
+            currentIndex++;
+            setTimeout(loadCard, 400);
+        }
+
+        function showResults() {
+            showScreen('result-screen');
+            document.getElementById('final-score').innerText = `${score} / ${keys.length} Correct`;
+        }
+
+        document.getElementById('answerInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                if(document.getElementById('mainBtn').innerText === "Next") {
+                    nextCard();
+                } else {
+                    checkAnswer();
+                }
+            }
+        });
+    </script>
+</body>
+</html>
